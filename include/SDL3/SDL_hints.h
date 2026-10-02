@@ -3853,6 +3853,38 @@ extern "C" {
 #define SDL_HINT_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY "SDL_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY"
 
 /**
+ * A variable controlling whether a live resize on macOS draws each new window
+ * size in the same screen update that shows it.
+ *
+ * While the user drags a window's edge, AppKit resizes the window step by
+ * step from inside its own event loop, and SDL keeps the app drawing there
+ * from a 60Hz timer. A frame drawn by the timer reaches the screen apart from
+ * the step that changed the window's size, so between the two the window
+ * shows its old contents stretched to the new size.
+ *
+ * The variable can be set to the following values:
+ *
+ * - "0": Only the timer draws during a live resize. (default)
+ * - "1": The window's Metal view draws each step from AppKit's display of it
+ *   (SDL_AppIterate() when the app uses the main callbacks, an
+ *   SDL_EVENT_WINDOW_EXPOSED event otherwise), with the view's layer set to
+ *   present with the Core Animation transaction
+ *   (CAMetalLayer.presentsWithTransaction) for that frame alone, so each
+ *   frame is committed together with the size it was drawn for. The timer
+ *   then only asks for a display, while the pointer rests.
+ *
+ * With "1" the app must present through the GPU API's Metal driver or SDL's
+ * Metal renderer, on the main thread, from inside the frame: a drawable
+ * presented later, from another thread, or by a Vulkan driver joins no
+ * transaction the window commits.
+ *
+ * This hint should be set before a live resize starts.
+ *
+ * \since This hint is available since SDL 3.4.16 with fizzy's patches.
+ */
+#define SDL_HINT_VIDEO_MAC_SYNC_LIVE_RESIZE "SDL_VIDEO_MAC_SYNC_LIVE_RESIZE"
+
+/**
  * A variable indicating whether the metal layer drawable size should be
  * updated for the SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED event on macOS.
  *

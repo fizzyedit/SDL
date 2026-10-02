@@ -132,6 +132,27 @@ static bool SDLCALL SDL_MetalViewEventWatch(void *userdata, SDL_Event *event)
     return nil;
 }
 
+/* During a live resize with SDL_HINT_VIDEO_MAC_SYNC_LIVE_RESIZE, AppKit
+ * displays this view at every resize step (the window listener sets its
+ * redraw policy for the length of the resize), and the frame is drawn here:
+ * inside the transaction that commits the step's new size. The layer presents
+ * with that transaction for this frame alone, so the frame and the size are
+ * shown together, and the drawable is handed back with the commit. */
+- (void)updateLayer
+{
+    SDL_Window *window = SDL_GetWindowFromID(self.sdlWindowID);
+    SDL_CocoaWindowData *data = window ? (__bridge SDL_CocoaWindowData *)window->internal : nil;
+    if (data != nil && [data.listener drawsLiveResizeInView:self]) {
+        CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
+        const BOOL presentsWithTransaction = metalLayer.presentsWithTransaction;
+        metalLayer.presentsWithTransaction = YES;
+        [data.listener drawLiveResizeFrame];
+        metalLayer.presentsWithTransaction = presentsWithTransaction;
+        return;
+    }
+    [super updateLayer];
+}
+
 @end
 
 SDL_MetalView Cocoa_Metal_CreateView(SDL_VideoDevice *_this, SDL_Window *window)

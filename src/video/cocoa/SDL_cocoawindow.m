@@ -1142,11 +1142,50 @@ static NSCursor *Cocoa_GetDesiredCursor(void)
 {
     // We'll try to maintain 60 FPS during live resizing
     const NSTimeInterval interval = 1.0 / 60.0;
+    const Uint64 intervalNS = SDL_NS_PER_SECOND / 60;
+
+    /* With SDL_HINT_VIDEO_MAC_SYNC_LIVE_RESIZE the Metal view draws the
+     * resize: AppKit displays it at every step (the redraw policy below), from
+     * inside the step's Core Animation transaction, and its updateLayer runs
+     * the frame there (drawLiveResizeFrame). */
+    liveResizeView = nil;
+    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_MAC_SYNC_LIVE_RESIZE, false)) {
+        NSView *view = [_data.nswindow.contentView viewWithTag:SDL_METALVIEW_TAG];
+        if (view != nil) {
+            liveResizeView = view;
+            liveResizeRedrawPolicy = view.layerContentsRedrawPolicy;
+            view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
+        }
+    }
+    liveResizeFrameNS = SDL_GetTicksNS();
+    liveResizeFellBack = NO;
+
     liveResizeTimer = [NSTimer scheduledTimerWithTimeInterval:interval
                                                       repeats:TRUE
                                                         block:^(NSTimer *unusedTimer)
     {
-        SDL_OnWindowLiveResizeUpdate(_data.window);
+        NSView *view = self->liveResizeView;
+        if (view == nil) {
+            [self updateLiveResize];
+            return;
+        }
+        /* Steps draw from the view's display; the timer only keeps frames
+         * coming while the pointer rests, through the same display, so that
+         * every frame is presented with the transaction it was drawn in. */
+        const Uint64 sinceFrame = SDL_GetTicksNS() - self->liveResizeFrameNS;
+        if (sinceFrame < intervalNS) {
+            return;
+        }
+        [view setNeedsDisplay:YES];
+        /* No frame from the display for a few ticks: AppKit is not displaying
+         * the view, so draw from here as SDL always has (out of step again). */
+        if (sinceFrame > 4 * intervalNS) {
+            if (!self->liveResizeFellBack) {
+                self->liveResizeFellBack = YES;
+                SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Live resize: the Metal view is not being displayed; drawing from the timer");
+            }
+            [self updateLiveResize];
+        }
     }];
 
     [[NSRunLoop currentRunLoop] addTimer:liveResizeTimer forMode:NSRunLoopCommonModes];
@@ -1156,6 +1195,47 @@ static NSCursor *Cocoa_GetDesiredCursor(void)
 {
     [liveResizeTimer invalidate];
     liveResizeTimer = nil;
+
+    NSView *view = liveResizeView;
+    if (view != nil) {
+        view.layerContentsRedrawPolicy = liveResizeRedrawPolicy;
+    }
+    liveResizeView = nil;
+}
+
+/* Run the app's frame from inside a live resize: SDL_AppIterate() when the app
+ * uses the main callbacks, an SDL_EVENT_WINDOW_EXPOSED event otherwise. Never
+ * from inside one already running, where a frame that resizes the window would
+ * otherwise start another. */
+- (void)updateLiveResize
+{
+    if (inLiveResizeUpdate) {
+        return;
+    }
+    inLiveResizeUpdate = YES;
+    SDL_OnWindowLiveResizeUpdate(_data.window);
+    inLiveResizeUpdate = NO;
+}
+
+- (BOOL)drawsLiveResizeInView:(NSView *)view
+{
+    return liveResizeTimer != nil && view != nil && liveResizeView == view;
+}
+
+/* A live-resize frame, from the Metal view's updateLayer while AppKit displays
+ * a resize step: inside the transaction that commits the step's new size, with
+ * the view's layer presenting with that transaction. */
+- (void)drawLiveResizeFrame
+{
+    if (inLiveResizeUpdate) {
+        return;
+    }
+    /* AppKit may display a step before it notifies of it: bring SDL's sizes,
+     * and with them the Metal view's drawable, up to the window first (a no-op
+     * when windowDidResize: has run for this step). */
+    [self windowDidResize:nil];
+    liveResizeFrameNS = SDL_GetTicksNS();
+    [self updateLiveResize];
 }
 
 - (void)windowWillMove:(NSNotification *)aNotification

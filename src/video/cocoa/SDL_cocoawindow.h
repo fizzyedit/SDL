@@ -60,6 +60,11 @@ typedef enum
     float pendingWindowWarpX, pendingWindowWarpY;
     BOOL isDragAreaRunning;
     NSTimer *liveResizeTimer;
+    __weak NSView *liveResizeView;
+    NSViewLayerContentsRedrawPolicy liveResizeRedrawPolicy;
+    Uint64 liveResizeFrameNS;
+    BOOL liveResizeFellBack;
+    BOOL inLiveResizeUpdate;
 }
 
 - (BOOL)isTouchFromTrackpad:(NSEvent *)theEvent;
@@ -87,6 +92,9 @@ typedef enum
 - (void)windowDidChangeOcclusionState:(NSNotification *)aNotification;
 - (void)windowWillStartLiveResize:(NSNotification *)aNotification;
 - (void)windowDidEndLiveResize:(NSNotification *)aNotification;
+- (void)updateLiveResize;
+- (BOOL)drawsLiveResizeInView:(NSView *)view;
+- (void)drawLiveResizeFrame;
 - (void)windowDidMove:(NSNotification *)aNotification;
 - (void)windowDidResize:(NSNotification *)aNotification;
 - (void)windowDidMiniaturize:(NSNotification *)aNotification;
