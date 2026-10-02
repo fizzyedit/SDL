@@ -96,6 +96,11 @@
 #endif
 #define DXGI_DLL      "dxgi.dll"
 #define DXGIDEBUG_DLL "dxgidebug.dll"
+#if !(defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES))
+// A transparent window's swapchain is shown through DirectComposition, which composites its alpha.
+#define USE_DIRECTCOMPOSITION
+#define DCOMP_DLL "dcomp.dll"
+#endif
 #elif defined(__APPLE__)
 #define D3D12_DLL     "libdxvk_d3d12.dylib"
 #define DXGI_DLL      "libdxvk_dxgi.dylib"
@@ -112,6 +117,7 @@
 #define DXGI_GET_DEBUG_INTERFACE_FUNC       "DXGIGetDebugInterface"
 #define D3D12_GET_DEBUG_INTERFACE_FUNC      "D3D12GetDebugInterface"
 #define D3D12_GET_INTERFACE_FUNC            "D3D12GetInterface"
+#define DCOMPOSITION_CREATE_DEVICE_FUNC     "DCompositionCreateDevice"
 #define WINDOW_PROPERTY_DATA                "SDL.internal.gpu.d3d12.data"
 #define D3D_FEATURE_LEVEL_CHOICE            D3D_FEATURE_LEVEL_11_0
 #define D3D_FEATURE_LEVEL_CHOICE_STR        "11_0"
@@ -156,6 +162,9 @@ static const IID D3D_IID_IDXGIDevice1 = { 0x77db970f, 0x6276, 0x48ba, { 0xba, 0x
 static const IID D3D_IID_IDXGIDevice = { 0x54ec77fa, 0x1377, 0x44e6, { 0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c } };
 #endif
 static const IID D3D_IID_IDXGISwapChain3 = { 0x94d99bdb, 0xf1f8, 0x4ab0, { 0xb2, 0x36, 0x7d, 0xa0, 0x17, 0x0e, 0xda, 0xb1 } };
+#ifdef USE_DIRECTCOMPOSITION
+static const IID D3D_IID_IDCompositionDevice = { 0xc37ea93a, 0xe7aa, 0x450d, { 0xb1, 0x6f, 0x97, 0x46, 0xcb, 0x04, 0x07, 0xf3 } };
+#endif
 #ifdef HAVE_IDXGIINFOQUEUE
 static const IID D3D_IID_IDXGIDebug = { 0x119e7452, 0xde9e, 0x40fe, { 0x88, 0x06, 0x88, 0xf9, 0x0c, 0x12, 0xb4, 0x41 } };
 static const IID D3D_IID_IDXGIInfoQueue = { 0xd67441c7, 0x672a, 0x476f, { 0x9e, 0x82, 0xcd, 0x55, 0xb4, 0x49, 0x49, 0xce } };
@@ -835,6 +844,62 @@ typedef struct D3D12Sampler
     SDL_AtomicInt referenceCount;
 } D3D12Sampler;
 
+#ifdef USE_DIRECTCOMPOSITION
+/* DirectComposition, for the few calls a transparent window needs. dcomp.h is C++-only (its
+ * interfaces overload methods), so these are declared here by their place in each vtable. */
+typedef struct D3D12_IDCompositionVisual D3D12_IDCompositionVisual;
+typedef struct D3D12_IDCompositionTarget D3D12_IDCompositionTarget;
+typedef struct D3D12_IDCompositionDevice D3D12_IDCompositionDevice;
+
+typedef struct D3D12_IDCompositionVisualVtbl
+{
+    HRESULT(STDMETHODCALLTYPE *QueryInterface)(D3D12_IDCompositionVisual *self, REFIID riid, void **object);
+    ULONG(STDMETHODCALLTYPE *AddRef)(D3D12_IDCompositionVisual *self);
+    ULONG(STDMETHODCALLTYPE *Release)(D3D12_IDCompositionVisual *self);
+    // SetOffsetX (2), SetOffsetY (2), SetTransform (2), SetTransformParent, SetEffect,
+    // SetBitmapInterpolationMode, SetBorderMode, SetClip (2)
+    void *unused[12];
+    HRESULT(STDMETHODCALLTYPE *SetContent)(D3D12_IDCompositionVisual *self, IUnknown *content);
+} D3D12_IDCompositionVisualVtbl;
+
+struct D3D12_IDCompositionVisual
+{
+    const D3D12_IDCompositionVisualVtbl *lpVtbl;
+};
+
+typedef struct D3D12_IDCompositionTargetVtbl
+{
+    HRESULT(STDMETHODCALLTYPE *QueryInterface)(D3D12_IDCompositionTarget *self, REFIID riid, void **object);
+    ULONG(STDMETHODCALLTYPE *AddRef)(D3D12_IDCompositionTarget *self);
+    ULONG(STDMETHODCALLTYPE *Release)(D3D12_IDCompositionTarget *self);
+    HRESULT(STDMETHODCALLTYPE *SetRoot)(D3D12_IDCompositionTarget *self, D3D12_IDCompositionVisual *visual);
+} D3D12_IDCompositionTargetVtbl;
+
+struct D3D12_IDCompositionTarget
+{
+    const D3D12_IDCompositionTargetVtbl *lpVtbl;
+};
+
+typedef struct D3D12_IDCompositionDeviceVtbl
+{
+    HRESULT(STDMETHODCALLTYPE *QueryInterface)(D3D12_IDCompositionDevice *self, REFIID riid, void **object);
+    ULONG(STDMETHODCALLTYPE *AddRef)(D3D12_IDCompositionDevice *self);
+    ULONG(STDMETHODCALLTYPE *Release)(D3D12_IDCompositionDevice *self);
+    HRESULT(STDMETHODCALLTYPE *Commit)(D3D12_IDCompositionDevice *self);
+    // WaitForCommitCompletion, GetFrameStatistics
+    void *unused[2];
+    HRESULT(STDMETHODCALLTYPE *CreateTargetForHwnd)(D3D12_IDCompositionDevice *self, HWND hwnd, BOOL topmost, D3D12_IDCompositionTarget **target);
+    HRESULT(STDMETHODCALLTYPE *CreateVisual)(D3D12_IDCompositionDevice *self, D3D12_IDCompositionVisual **visual);
+} D3D12_IDCompositionDeviceVtbl;
+
+struct D3D12_IDCompositionDevice
+{
+    const D3D12_IDCompositionDeviceVtbl *lpVtbl;
+};
+
+typedef HRESULT(WINAPI *pfnDCompositionCreateDevice)(IDXGIDevice *dxgiDevice, REFIID iid, void **dcompositionDevice);
+#endif
+
 typedef struct D3D12WindowData
 {
     SDL_Window *window;
@@ -844,6 +909,15 @@ typedef struct D3D12WindowData
     D3D12XBOX_FRAME_PIPELINE_TOKEN frameToken;
 #else
     IDXGISwapChain3 *swapchain;
+    // Shown through DirectComposition (a transparent window): its alpha is composited, it never tears.
+    bool composited;
+#endif
+#ifdef USE_DIRECTCOMPOSITION
+    // Made with the window's first composited swapchain and kept until the window is released: a
+    // window has only one topmost target. Each new swapchain becomes the visual's content.
+    D3D12_IDCompositionDevice *dcompDevice;
+    D3D12_IDCompositionTarget *dcompTarget;
+    D3D12_IDCompositionVisual *dcompVisual;
 #endif
     SDL_GPUPresentMode present_mode;
     SDL_GPUSwapchainComposition swapchainComposition;
@@ -887,6 +961,11 @@ struct D3D12Renderer
     IDXGIAdapter1 *adapter;
     SDL_SharedObject *dxgi_dll;
     SDL_SharedObject *dxgidebug_dll;
+#endif
+#ifdef USE_DIRECTCOMPOSITION
+    // Loaded with the first transparent window.
+    SDL_SharedObject *dcomp_dll;
+    pfnDCompositionCreateDevice pDCompositionCreateDevice;
 #endif
 #ifdef USE_PIX_RUNTIME
     SDL_SharedObject *winpixeventruntime_dll;
@@ -1733,6 +1812,12 @@ static void D3D12_INTERNAL_DestroyRenderer(D3D12Renderer *renderer)
     if (renderer->dxgidebug_dll) {
         SDL_UnloadObject(renderer->dxgidebug_dll);
         renderer->dxgidebug_dll = NULL;
+    }
+#endif
+#ifdef USE_DIRECTCOMPOSITION
+    if (renderer->dcomp_dll) {
+        SDL_UnloadObject(renderer->dcomp_dll);
+        renderer->dcomp_dll = NULL;
     }
 #endif
 #ifdef USE_PIX_RUNTIME
@@ -6925,14 +7010,23 @@ static bool D3D12_INTERNAL_ResizeSwapchain(
         SDL_free(windowData->textureContainers[i].textures);
     }
 
-    // Resize the swapchain
+    // Resize the swapchain: one made for the HWND takes the client area's size (0), a composition
+    // swapchain has no window to take it from
+    UINT width = 0;
+    UINT height = 0;
+    if (windowData->composited) {
+        int w, h;
+        SDL_GetWindowSizeInPixels(windowData->window, &w, &h);
+        width = (UINT)SDL_max(w, 1);
+        height = (UINT)SDL_max(h, 1);
+    }
     HRESULT res = IDXGISwapChain_ResizeBuffers(
         windowData->swapchain,
         0, // Keep buffer count the same
-        0, // use client window width
-        0, // use client window height
+        width,
+        height,
         DXGI_FORMAT_UNKNOWN, // Keep the old format
-        renderer->supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
+        (renderer->supportsTearing && !windowData->composited) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
     CHECK_D3D12_ERROR_AND_RETURN("Could not resize swapchain buffers", false);
 
     // Create texture object for the swapchain
@@ -6957,6 +7051,85 @@ static bool D3D12_INTERNAL_ResizeSwapchain(
     return true;
 }
 
+#ifdef USE_DIRECTCOMPOSITION
+/* Shows `swapchain` in the window through DirectComposition, which composites its premultiplied
+ * alpha with whatever is behind the window (the desktop, or a backdrop DWM draws). The device, the
+ * window's target and the visual are made the first time and kept for the window's later
+ * swapchains. */
+static bool D3D12_INTERNAL_SetCompositionContent(
+    D3D12Renderer *renderer,
+    D3D12WindowData *windowData,
+    HWND hwnd,
+    IUnknown *swapchain)
+{
+    HRESULT res;
+
+    if (windowData->dcompDevice == NULL) {
+        if (renderer->pDCompositionCreateDevice == NULL) {
+            renderer->dcomp_dll = SDL_LoadObject(DCOMP_DLL);
+            if (renderer->dcomp_dll == NULL) {
+                SET_STRING_ERROR_AND_RETURN("Could not find " DCOMP_DLL ", which a transparent window needs", false);
+            }
+            renderer->pDCompositionCreateDevice = (pfnDCompositionCreateDevice)SDL_LoadFunction(
+                renderer->dcomp_dll,
+                DCOMPOSITION_CREATE_DEVICE_FUNC);
+            if (renderer->pDCompositionCreateDevice == NULL) {
+                SET_STRING_ERROR_AND_RETURN("Could not find function " DCOMPOSITION_CREATE_DEVICE_FUNC " in " DCOMP_DLL, false);
+            }
+        }
+
+        // No DXGI device: DirectComposition only shows the swapchain, it makes no surfaces of its own.
+        res = renderer->pDCompositionCreateDevice(
+            NULL,
+            D3D_GUID(D3D_IID_IDCompositionDevice),
+            (void **)&windowData->dcompDevice);
+        CHECK_D3D12_ERROR_AND_RETURN("Could not create DirectComposition device", false);
+
+        // Topmost: over the window's own (GDI) content, which a transparent window keeps clear.
+        res = windowData->dcompDevice->lpVtbl->CreateTargetForHwnd(
+            windowData->dcompDevice,
+            hwnd,
+            TRUE,
+            &windowData->dcompTarget);
+        CHECK_D3D12_ERROR_AND_RETURN("Could not create DirectComposition target", false);
+
+        res = windowData->dcompDevice->lpVtbl->CreateVisual(
+            windowData->dcompDevice,
+            &windowData->dcompVisual);
+        CHECK_D3D12_ERROR_AND_RETURN("Could not create DirectComposition visual", false);
+
+        res = windowData->dcompTarget->lpVtbl->SetRoot(
+            windowData->dcompTarget,
+            windowData->dcompVisual);
+        CHECK_D3D12_ERROR_AND_RETURN("Could not set DirectComposition root visual", false);
+    }
+
+    res = windowData->dcompVisual->lpVtbl->SetContent(windowData->dcompVisual, swapchain);
+    CHECK_D3D12_ERROR_AND_RETURN("Could not set DirectComposition content", false);
+
+    res = windowData->dcompDevice->lpVtbl->Commit(windowData->dcompDevice);
+    CHECK_D3D12_ERROR_AND_RETURN("Could not commit DirectComposition", false);
+
+    return true;
+}
+
+static void D3D12_INTERNAL_ReleaseComposition(D3D12WindowData *windowData)
+{
+    if (windowData->dcompVisual != NULL) {
+        windowData->dcompVisual->lpVtbl->Release(windowData->dcompVisual);
+        windowData->dcompVisual = NULL;
+    }
+    if (windowData->dcompTarget != NULL) {
+        windowData->dcompTarget->lpVtbl->Release(windowData->dcompTarget);
+        windowData->dcompTarget = NULL;
+    }
+    if (windowData->dcompDevice != NULL) {
+        windowData->dcompDevice->lpVtbl->Release(windowData->dcompDevice);
+        windowData->dcompDevice = NULL;
+    }
+}
+#endif
+
 static void D3D12_INTERNAL_DestroySwapchain(
     D3D12Renderer *renderer,
     D3D12WindowData *windowData)
@@ -6974,6 +7147,7 @@ static void D3D12_INTERNAL_DestroySwapchain(
         SDL_free(windowData->textureContainers[i].textures);
     }
 
+    // A composited window's visual keeps its own reference until its next swapchain replaces it
     IDXGISwapChain_Release(windowData->swapchain);
     windowData->swapchain = NULL;
 }
@@ -6992,6 +7166,12 @@ static bool D3D12_INTERNAL_CreateSwapchain(
     IDXGISwapChain1 *swapchain;
     IDXGISwapChain3 *swapchain3;
     HRESULT res;
+    bool composited = false;
+
+#ifdef USE_DIRECTCOMPOSITION
+    // A swapchain made for the HWND ignores alpha; one shown through DirectComposition does not
+    composited = (windowData->window->flags & SDL_WINDOW_TRANSPARENT) != 0;
+#endif
 
     // Get the DXGI handle
 #ifdef _WIN32
@@ -7019,6 +7199,19 @@ static bool D3D12_INTERNAL_CreateSwapchain(
     swapchainDesc.Flags = 0;
     swapchainDesc.Stereo = 0;
 
+    if (composited) {
+        /* What CreateSwapChainForComposition documents: an explicit size (there is no window to
+         * take it from), stretch scaling and the sequential flip model; and the premultiplied
+         * alpha DirectComposition composites. */
+        int w, h;
+        SDL_GetWindowSizeInPixels(windowData->window, &w, &h);
+        swapchainDesc.Width = (UINT)SDL_max(w, 1);
+        swapchainDesc.Height = (UINT)SDL_max(h, 1);
+        swapchainDesc.Scaling = DXGI_SCALING_STRETCH;
+        swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+        swapchainDesc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
+    }
+
     // Initialize the fullscreen descriptor (if needed)
     fullscreenDesc.RefreshRate.Numerator = 0;
     fullscreenDesc.RefreshRate.Denominator = 0;
@@ -7026,7 +7219,8 @@ static bool D3D12_INTERNAL_CreateSwapchain(
     fullscreenDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
     fullscreenDesc.Windowed = true;
 
-    if (renderer->supportsTearing) {
+    // DWM composites a composition swapchain like any other content, so it never tears
+    if (renderer->supportsTearing && !composited) {
         swapchainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
     } else {
         swapchainDesc.Flags = 0;
@@ -7037,14 +7231,26 @@ static bool D3D12_INTERNAL_CreateSwapchain(
     }
 
     // Create the swapchain!
-    res = IDXGIFactory4_CreateSwapChainForHwnd(
-        renderer->factory,
-        (IUnknown *)renderer->commandQueue,
-        dxgiHandle,
-        &swapchainDesc,
-        &fullscreenDesc,
-        NULL,
-        &swapchain);
+#ifdef USE_DIRECTCOMPOSITION
+    if (composited) {
+        res = IDXGIFactory4_CreateSwapChainForComposition(
+            renderer->factory,
+            (IUnknown *)renderer->commandQueue,
+            &swapchainDesc,
+            NULL,
+            &swapchain);
+    } else
+#endif
+    {
+        res = IDXGIFactory4_CreateSwapChainForHwnd(
+            renderer->factory,
+            (IUnknown *)renderer->commandQueue,
+            dxgiHandle,
+            &swapchainDesc,
+            &fullscreenDesc,
+            NULL,
+            &swapchain);
+    }
     CHECK_D3D12_ERROR_AND_RETURN("Could not create swapchain", false);
 
     res = IDXGISwapChain1_QueryInterface(
@@ -7060,6 +7266,14 @@ static bool D3D12_INTERNAL_CreateSwapchain(
             swapchain3,
             SwapchainCompositionToColorSpace[swapchainComposition]);
     }
+
+#ifdef USE_DIRECTCOMPOSITION
+    if (composited && !D3D12_INTERNAL_SetCompositionContent(renderer, windowData, dxgiHandle, (IUnknown *)swapchain3)) {
+        IDXGISwapChain3_Release(swapchain3);
+        D3D12_INTERNAL_ReleaseComposition(windowData);
+        return false;
+    }
+#endif
 
     /*
      * The swapchain's parent is a separate factory from the factory that
@@ -7099,6 +7313,7 @@ static bool D3D12_INTERNAL_CreateSwapchain(
 
     // Initialize the swapchain data
     windowData->swapchain = swapchain3;
+    windowData->composited = composited;
     windowData->present_mode = presentMode;
     windowData->swapchainComposition = swapchainComposition;
     windowData->swapchainColorSpace = SwapchainCompositionToColorSpace[swapchainComposition];
@@ -7149,10 +7364,12 @@ static bool D3D12_ClaimWindow(
     D3D12Renderer *renderer = (D3D12Renderer *)driverData;
     D3D12WindowData *windowData = D3D12_INTERNAL_FetchWindowData(window);
 
-    // A flip-model swapchain made for an HWND ignores alpha.
+#ifndef USE_DIRECTCOMPOSITION
+    // A transparent window is composited through DirectComposition, which only desktop Windows has.
     if ((window->flags & SDL_WINDOW_TRANSPARENT) != 0) {
-        SET_STRING_ERROR_AND_RETURN("The D3D12 GPU driver doesn't support transparent windows", false);
+        SET_STRING_ERROR_AND_RETURN("The D3D12 GPU driver supports transparent windows only on desktop Windows", false);
     }
+#endif
 
     if (windowData == NULL) {
         windowData = (D3D12WindowData *)SDL_calloc(1, sizeof(D3D12WindowData));
@@ -7181,6 +7398,10 @@ static bool D3D12_ClaimWindow(
 
             return true;
         } else {
+#ifdef USE_DIRECTCOMPOSITION
+            // Or the window's target outlives it, and no later claim can make another
+            D3D12_INTERNAL_ReleaseComposition(windowData);
+#endif
             SDL_free(windowData);
             return false;
         }
@@ -7223,6 +7444,9 @@ static void D3D12_ReleaseWindow(
     }
 
     D3D12_INTERNAL_DestroySwapchain(renderer, windowData);
+#ifdef USE_DIRECTCOMPOSITION
+    D3D12_INTERNAL_ReleaseComposition(windowData);
+#endif
 
     SDL_LockMutex(renderer->windowLock);
     for (Uint32 i = 0; i < renderer->claimedWindowCount; i += 1) {
@@ -8096,6 +8320,7 @@ static bool D3D12_Submit(
 
         Uint32 presentFlags = 0;
         if (renderer->supportsTearing &&
+            !windowData->composited &&
             windowData->present_mode == SDL_GPU_PRESENTMODE_IMMEDIATE) {
             presentFlags = DXGI_PRESENT_ALLOW_TEARING;
         }
