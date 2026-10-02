@@ -137,20 +137,25 @@ static bool SDLCALL SDL_MetalViewEventWatch(void *userdata, SDL_Event *event)
  * redraw policy for the length of the resize), and the frame is drawn here:
  * inside the transaction that commits the step's new size. The layer presents
  * with that transaction for this frame alone, so the frame and the size are
- * shown together, and the drawable is handed back with the commit. */
-- (void)updateLayer
+ * shown together, and the drawable is handed back with the commit.
+ *
+ * This is the layer's delegate method, not -updateLayer: AppKit marks this
+ * view as needing display at every step but never calls -updateLayer for it;
+ * its CAMetalLayer is displayed only through the delegate's -displayLayer:,
+ * which NSView does not implement (seen on macOS 26). Outside a live resize
+ * there is nothing to draw here: the layer's contents are the drawables the
+ * app presents. */
+- (void)displayLayer:(CALayer *)layer
 {
     SDL_Window *window = SDL_GetWindowFromID(self.sdlWindowID);
     SDL_CocoaWindowData *data = window ? (__bridge SDL_CocoaWindowData *)window->internal : nil;
     if (data != nil && [data.listener drawsLiveResizeInView:self]) {
-        CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
+        CAMetalLayer *metalLayer = (CAMetalLayer *)layer;
         const BOOL presentsWithTransaction = metalLayer.presentsWithTransaction;
         metalLayer.presentsWithTransaction = YES;
         [data.listener drawLiveResizeFrame];
         metalLayer.presentsWithTransaction = presentsWithTransaction;
-        return;
     }
-    [super updateLayer];
 }
 
 @end

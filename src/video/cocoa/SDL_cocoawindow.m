@@ -1146,7 +1146,7 @@ static NSCursor *Cocoa_GetDesiredCursor(void)
 
     /* With SDL_HINT_VIDEO_MAC_SYNC_LIVE_RESIZE the Metal view draws the
      * resize: AppKit displays it at every step (the redraw policy below), from
-     * inside the step's Core Animation transaction, and its updateLayer runs
+     * inside the step's Core Animation transaction, and its displayLayer: runs
      * the frame there (drawLiveResizeFrame). */
     liveResizeView = nil;
     if (SDL_GetHintBoolean(SDL_HINT_VIDEO_MAC_SYNC_LIVE_RESIZE, false)) {
@@ -1222,7 +1222,7 @@ static NSCursor *Cocoa_GetDesiredCursor(void)
     return liveResizeTimer != nil && view != nil && liveResizeView == view;
 }
 
-/* A live-resize frame, from the Metal view's updateLayer while AppKit displays
+/* A live-resize frame, from the Metal view's displayLayer: while AppKit displays
  * a resize step: inside the transaction that commits the step's new size, with
  * the view's layer presenting with that transaction. */
 - (void)drawLiveResizeFrame
