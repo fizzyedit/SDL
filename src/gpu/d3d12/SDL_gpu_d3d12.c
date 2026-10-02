@@ -7149,6 +7149,11 @@ static bool D3D12_ClaimWindow(
     D3D12Renderer *renderer = (D3D12Renderer *)driverData;
     D3D12WindowData *windowData = D3D12_INTERNAL_FetchWindowData(window);
 
+    // A flip-model swapchain made for an HWND ignores alpha.
+    if ((window->flags & SDL_WINDOW_TRANSPARENT) != 0) {
+        SET_STRING_ERROR_AND_RETURN("The D3D12 GPU driver doesn't support transparent windows", false);
+    }
+
     if (windowData == NULL) {
         windowData = (D3D12WindowData *)SDL_calloc(1, sizeof(D3D12WindowData));
         if (!windowData) {

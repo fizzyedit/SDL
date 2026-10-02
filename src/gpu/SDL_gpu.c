@@ -3195,10 +3195,8 @@ bool SDL_ClaimWindowForGPUDevice(
         return SDL_InvalidParamError("window");
     }
 
-    if ((window->flags & SDL_WINDOW_TRANSPARENT) != 0) {
-        return SDL_SetError("The GPU API doesn't support transparent windows");
-    }
-
+    // Transparent windows are up to each driver: Metal and Vulkan composite the swapchain's
+    // alpha where the platform allows it.
     return device->ClaimWindow(
         device->driverData,
         window);
