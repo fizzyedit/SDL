@@ -1352,6 +1352,21 @@ extern SDL_DECLSPEC SDL_Window * SDLCALL SDL_CreatePopupWindow(SDL_Window *paren
  * - `SDL_PROP_WINDOW_CREATE_WAYLAND_WL_SURFACE_POINTER` - the wl_surface
  *   associated with the window, if you want to wrap an existing window. See
  *   [README-wayland](README-wayland) for more information.
+ * - `SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_LEFT_NUMBER`,
+ *   `SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_TOP_NUMBER`,
+ *   `SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_RIGHT_NUMBER` and
+ *   `SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_BOTTOM_NUMBER` - margins, in
+ *   window coordinates, of the window's surface that lie outside its frame,
+ *   where an application that draws its own decorations draws its drop
+ *   shadow. While the window floats (neither maximized, tiled nor fullscreen)
+ *   the compositor is told the frame is the window
+ *   (`xdg_surface.set_window_geometry`), so it places, snaps and tiles the
+ *   frame; the surface grows by the margins around the size it configures;
+ *   and only the frame and a band of up to 8 units around it take input, so
+ *   the rest of the shadow passes clicks through. Maximized, tiled or
+ *   fullscreen, the margins are zero (see
+ *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_LEFT_NUMBER`). xdg-shell windows
+ *   only, not libdecor's.
  *
  * These are additional supported properties on Windows:
  *
@@ -1441,6 +1456,10 @@ extern SDL_DECLSPEC SDL_Window * SDLCALL SDL_CreateWindowWithProperties(SDL_Prop
 #define SDL_PROP_WINDOW_CREATE_WAYLAND_SURFACE_ROLE_CUSTOM_BOOLEAN "SDL.window.create.wayland.surface_role_custom"
 #define SDL_PROP_WINDOW_CREATE_WAYLAND_CREATE_EGL_WINDOW_BOOLEAN   "SDL.window.create.wayland.create_egl_window"
 #define SDL_PROP_WINDOW_CREATE_WAYLAND_WL_SURFACE_POINTER          "SDL.window.create.wayland.wl_surface"
+#define SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_LEFT_NUMBER     "SDL.window.create.wayland.frame_inset.left"
+#define SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_TOP_NUMBER      "SDL.window.create.wayland.frame_inset.top"
+#define SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_RIGHT_NUMBER    "SDL.window.create.wayland.frame_inset.right"
+#define SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_BOTTOM_NUMBER   "SDL.window.create.wayland.frame_inset.bottom"
 #define SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER                  "SDL.window.create.win32.hwnd"
 #define SDL_PROP_WINDOW_CREATE_WIN32_PIXEL_FORMAT_HWND_POINTER     "SDL.window.create.win32.pixel_format_hwnd"
 #define SDL_PROP_WINDOW_CREATE_X11_WINDOW_NUMBER                   "SDL.window.create.x11.window"
@@ -1600,6 +1619,13 @@ extern SDL_DECLSPEC SDL_Window * SDLCALL SDL_GetWindowParent(SDL_Window *window)
  *   associated with the window
  * - `SDL_PROP_WINDOW_WAYLAND_XDG_POSITIONER_POINTER`: the xdg_positioner
  *   associated with the window, in popup mode
+ * - `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_LEFT_NUMBER`,
+ *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_TOP_NUMBER`,
+ *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_RIGHT_NUMBER` and
+ *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_BOTTOM_NUMBER`: the frame insets in
+ *   effect now, in window coordinates — those asked for at creation while the
+ *   window floats, zero while it is maximized, tiled or fullscreen. They
+ *   change with the window's size; read them on `SDL_EVENT_WINDOW_RESIZED`.
  *
  * On X11:
  *
@@ -1659,6 +1685,10 @@ extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetWindowProperties(SDL_Window 
 #define SDL_PROP_WINDOW_WAYLAND_XDG_TOPLEVEL_EXPORT_HANDLE_STRING   "SDL.window.wayland.xdg_toplevel_export_handle"
 #define SDL_PROP_WINDOW_WAYLAND_XDG_POPUP_POINTER                   "SDL.window.wayland.xdg_popup"
 #define SDL_PROP_WINDOW_WAYLAND_XDG_POSITIONER_POINTER              "SDL.window.wayland.xdg_positioner"
+#define SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_LEFT_NUMBER             "SDL.window.wayland.frame_inset.left"
+#define SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_TOP_NUMBER              "SDL.window.wayland.frame_inset.top"
+#define SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_RIGHT_NUMBER            "SDL.window.wayland.frame_inset.right"
+#define SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_BOTTOM_NUMBER           "SDL.window.wayland.frame_inset.bottom"
 #define SDL_PROP_WINDOW_X11_DISPLAY_POINTER                         "SDL.window.x11.display"
 #define SDL_PROP_WINDOW_X11_SCREEN_NUMBER                           "SDL.window.x11.screen"
 #define SDL_PROP_WINDOW_X11_WINDOW_NUMBER                           "SDL.window.x11.window"

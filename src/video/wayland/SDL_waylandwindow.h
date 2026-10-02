@@ -201,6 +201,15 @@ struct SDL_WindowData
     Uint64 last_focus_event_time_ns;
     int icc_fd;
     Uint32 icc_size;
+    /* Margins of the surface outside the window's frame, for a shadow the application draws
+     * (SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_*): as asked for at creation, and as in
+     * effect now — those while the toplevel floats, zero otherwise. Window coordinates.
+     */
+    struct
+    {
+        int left, top, right, bottom;
+    } frame_insets, applied_frame_insets;
+
     bool floating;
     bool suspended;
     bool resizing;
