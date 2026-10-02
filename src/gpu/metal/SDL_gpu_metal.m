@@ -4077,10 +4077,24 @@ static bool METAL_Submit(
             return false;
         }
 
+        /* Drawables whose layer presents with the Core Animation transaction
+         * (CAMetalLayer.presentsWithTransaction): presented below, on this thread,
+         * once the command buffer is scheduled. */
+        NSMutableArray<id<CAMetalDrawable>> *transactionDrawables = nil;
+
         // Enqueue present requests, if applicable
         for (Uint32 i = 0; i < metalCommandBuffer->windowDataCount; i += 1) {
             MetalWindowData *windowData = metalCommandBuffer->windowDatas[i];
-            [metalCommandBuffer->handle presentDrawable:windowData->drawable];
+            if (windowData->layer.presentsWithTransaction) {
+                if (windowData->drawable != nil) {
+                    if (transactionDrawables == nil) {
+                        transactionDrawables = [NSMutableArray array];
+                    }
+                    [transactionDrawables addObject:windowData->drawable];
+                }
+            } else {
+                [metalCommandBuffer->handle presentDrawable:windowData->drawable];
+            }
             windowData->drawable = nil;
 
             windowData->inFlightFences[windowData->frameCounter] = (SDL_GPUFence *)metalCommandBuffer->fence;
@@ -4091,7 +4105,8 @@ static bool METAL_Submit(
         }
 
         // Submit the command buffer
-        [metalCommandBuffer->handle commit];
+        id<MTLCommandBuffer> handle = metalCommandBuffer->handle;
+        [handle commit];
         metalCommandBuffer->handle = nil;
 
         // Mark the command buffer as submitted
@@ -4118,6 +4133,17 @@ static bool METAL_Submit(
         METAL_INTERNAL_PerformPendingDestroys(renderer);
 
         SDL_UnlockMutex(renderer->submitLock);
+
+        /* A layer that presents with the transaction shows its drawable in the Core
+         * Animation transaction open on this thread, together with whatever else that
+         * transaction changes: during a live resize, the window's new size. Apple's
+         * recipe: commit, wait until scheduled, then present the drawable itself. */
+        if (transactionDrawables != nil) {
+            [handle waitUntilScheduled];
+            for (id<CAMetalDrawable> drawable in transactionDrawables) {
+                [drawable present];
+            }
+        }
 
         return true;
     }

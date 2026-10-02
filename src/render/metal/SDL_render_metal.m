@@ -2030,12 +2030,25 @@ static bool METAL_RenderPresent(SDL_Renderer *renderer)
 
         // If we don't have a drawable to present, don't try to present it.
         //  But we'll still try to commit the command buffer in case it was already enqueued.
+        id<CAMetalDrawable> transactionDrawable = nil;
         if (ready) {
             SDL_assert(data.mtlbackbuffer != nil);
-            [data.mtlcmdbuffer presentDrawable:data.mtlbackbuffer];
+            if (data.mtllayer.presentsWithTransaction) {
+                transactionDrawable = data.mtlbackbuffer;
+            } else {
+                [data.mtlcmdbuffer presentDrawable:data.mtlbackbuffer];
+            }
         }
 
         [data.mtlcmdbuffer commit];
+
+        /* A layer that presents with the Core Animation transaction
+         * (CAMetalLayer.presentsWithTransaction) shows its drawable in the transaction
+         * open on this thread: commit, wait until scheduled, then present the drawable. */
+        if (transactionDrawable != nil) {
+            [data.mtlcmdbuffer waitUntilScheduled];
+            [transactionDrawable present];
+        }
 
         data.mtlcmdencoder = nil;
         data.mtlcmdbuffer = nil;
