@@ -3885,6 +3885,39 @@ extern "C" {
 #define SDL_HINT_VIDEO_MAC_SYNC_LIVE_RESIZE "SDL_VIDEO_MAC_SYNC_LIVE_RESIZE"
 
 /**
+ * A variable controlling whether a live resize on Windows draws each new
+ * window size before the resize takes its next step.
+ *
+ * While the user drags a window's edge, Windows resizes the window step by
+ * step from inside a modal loop of its own, and SDL keeps the app drawing
+ * there from a timer. The compositor shows the window at its new size with
+ * whatever frame it already has, unscaled: until the timer's next frame, a
+ * window that grew shows an edge with nothing drawn on it and one that shrank
+ * cuts its frame off.
+ *
+ * The variable can be set to the following values:
+ *
+ * - "0": Only the timer draws during a live resize. (default)
+ * - "1": Each step that changes the window's size draws a frame at the new
+ *   size before returning to the loop (SDL_AppIterate() when the app uses the
+ *   main callbacks, an SDL_EVENT_WINDOW_EXPOSED event otherwise), then waits
+ *   until the compositor has shown it (DwmFlush), so the loop's next step
+ *   starts just after a composite and a size and the frame drawn for it reach
+ *   the screen together. The timer then draws only while the pointer rests.
+ * - "2": As "1", with a line per step through SDL_Log: the size, how long the
+ *   frame took and how long the compositor took to show it.
+ *
+ * The compositor applies a window's size and its frame separately, so a
+ * composite that falls between the two still shows one mismatched frame;
+ * drawing each step right after a composite makes that rare.
+ *
+ * This hint should be set before a live resize starts.
+ *
+ * \since This hint is available since SDL 3.4.16 with fizzy's patches.
+ */
+#define SDL_HINT_VIDEO_WIN_SYNC_LIVE_RESIZE "SDL_VIDEO_WIN_SYNC_LIVE_RESIZE"
+
+/**
  * A variable indicating whether the metal layer drawable size should be
  * updated for the SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED event on macOS.
  *

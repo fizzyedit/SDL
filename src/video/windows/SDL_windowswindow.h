@@ -87,6 +87,13 @@ struct SDL_WindowData
     bool disable_move_size_events;
     bool showing_window;
     int in_modal_loop;
+    /* SDL_HINT_VIDEO_WIN_SYNC_LIVE_RESIZE: the client size the last step of a live resize drew,
+     * when it was shown, and whether a step is drawing now (the app's frame may move the window
+     * itself, which must not draw another). */
+    int live_resize_w;
+    int live_resize_h;
+    Uint64 live_resize_shown_ns;
+    bool in_live_resize_step;
     int last_modal_width;
     int last_modal_height;
     RECT initial_size_rect;
