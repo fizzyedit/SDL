@@ -209,6 +209,8 @@ struct SDL_WindowData
     {
         int left, top, right, bottom;
     } frame_insets, applied_frame_insets;
+    // The band round the frame that takes input (SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INPUT_MARGIN_NUMBER).
+    int frame_input_margin;
 
     bool floating;
     bool suspended;

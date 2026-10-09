@@ -145,9 +145,10 @@ static void GetBufferSize(SDL_Window *window, int *width, int *height)
     }
 }
 
-/* The band around a frame with insets that still takes input, in window coordinates: where an
- * application's hit test answers the edges it resizes from, as a decorated window's border
- * would, while the rest of its shadow passes clicks through.
+/* The band around a frame with insets that still takes input by default, in window coordinates:
+ * where an application's hit test answers the edges it resizes from, as a decorated window's
+ * border would, while the rest of its shadow passes clicks through
+ * (SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INPUT_MARGIN_NUMBER).
  */
 #define WAYLAND_FRAME_INPUT_MARGIN 8
 
@@ -169,18 +170,19 @@ static bool HasFrameInsets(SDL_WindowData *wind)
     return wind->frame_insets.left || wind->frame_insets.top || wind->frame_insets.right || wind->frame_insets.bottom;
 }
 
-/* The frame insets asked for at creation are kept in the window's properties as well, which
- * outlive the window data: SDL_RecreateWindow makes the window again with no creation
- * properties, and the window keeps its insets.
+/* The frame insets and input margin asked for at creation are kept in the window's properties
+ * as well, which outlive the window data: SDL_RecreateWindow makes the window again with no
+ * creation properties, and the window keeps its insets.
  */
 #define WAYLAND_KEPT_FRAME_INSET_LEFT   "SDL.internal.wayland.frame_inset.left"
 #define WAYLAND_KEPT_FRAME_INSET_TOP    "SDL.internal.wayland.frame_inset.top"
 #define WAYLAND_KEPT_FRAME_INSET_RIGHT  "SDL.internal.wayland.frame_inset.right"
 #define WAYLAND_KEPT_FRAME_INSET_BOTTOM "SDL.internal.wayland.frame_inset.bottom"
+#define WAYLAND_KEPT_FRAME_INPUT_MARGIN "SDL.internal.wayland.frame_input_margin"
 
-static int GetKeptCreateNumber(SDL_PropertiesID create_props, SDL_PropertiesID window_props, const char *create_name, const char *kept_name)
+static int GetKeptCreateNumber(SDL_PropertiesID create_props, SDL_PropertiesID window_props, const char *create_name, const char *kept_name, int default_value)
 {
-    const Sint64 kept = SDL_GetNumberProperty(window_props, kept_name, 0);
+    const Sint64 kept = SDL_GetNumberProperty(window_props, kept_name, default_value);
     const int value = SDL_max((int)SDL_GetNumberProperty(create_props, create_name, kept), 0);
 
     SDL_SetNumberProperty(window_props, kept_name, value);
@@ -201,10 +203,10 @@ static void ApplyFrameInsets(SDL_Window *window, int left, int top, int right, i
     }
 
     if (left || top || right || bottom) {
-        const int ml = SDL_min(left, WAYLAND_FRAME_INPUT_MARGIN);
-        const int mt = SDL_min(top, WAYLAND_FRAME_INPUT_MARGIN);
-        const int mr = SDL_min(right, WAYLAND_FRAME_INPUT_MARGIN);
-        const int mb = SDL_min(bottom, WAYLAND_FRAME_INPUT_MARGIN);
+        const int ml = SDL_min(left, wind->frame_input_margin);
+        const int mt = SDL_min(top, wind->frame_input_margin);
+        const int mr = SDL_min(right, wind->frame_input_margin);
+        const int mb = SDL_min(bottom, wind->frame_input_margin);
         struct wl_region *region = wl_compositor_create_region(wind->waylandData->compositor);
         wl_region_add(region, left - ml, top - mt, frame_w + ml + mr, frame_h + mt + mb);
         wl_surface_set_input_region(wind->surface, region);
@@ -2877,10 +2879,11 @@ bool Wayland_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Proper
      */
     if (!SDL_WINDOW_IS_POPUP(window) && !custom_surface_role) {
         const SDL_PropertiesID window_props = SDL_GetWindowProperties(window);
-        data->frame_insets.left = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_LEFT_NUMBER, WAYLAND_KEPT_FRAME_INSET_LEFT);
-        data->frame_insets.top = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_TOP_NUMBER, WAYLAND_KEPT_FRAME_INSET_TOP);
-        data->frame_insets.right = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_RIGHT_NUMBER, WAYLAND_KEPT_FRAME_INSET_RIGHT);
-        data->frame_insets.bottom = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_BOTTOM_NUMBER, WAYLAND_KEPT_FRAME_INSET_BOTTOM);
+        data->frame_insets.left = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_LEFT_NUMBER, WAYLAND_KEPT_FRAME_INSET_LEFT, 0);
+        data->frame_insets.top = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_TOP_NUMBER, WAYLAND_KEPT_FRAME_INSET_TOP, 0);
+        data->frame_insets.right = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_RIGHT_NUMBER, WAYLAND_KEPT_FRAME_INSET_RIGHT, 0);
+        data->frame_insets.bottom = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_BOTTOM_NUMBER, WAYLAND_KEPT_FRAME_INSET_BOTTOM, 0);
+        data->frame_input_margin = GetKeptCreateNumber(create_props, window_props, SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INPUT_MARGIN_NUMBER, WAYLAND_KEPT_FRAME_INPUT_MARGIN, WAYLAND_FRAME_INPUT_MARGIN);
     }
 
     data->scale_factor = 1.0;

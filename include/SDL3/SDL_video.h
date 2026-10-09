@@ -1362,13 +1362,20 @@ extern SDL_DECLSPEC SDL_Window * SDLCALL SDL_CreatePopupWindow(SDL_Window *paren
  *   the compositor is told the frame is the window
  *   (`xdg_surface.set_window_geometry`), so it places, snaps and tiles the
  *   frame; the surface grows by the margins around the size it configures;
- *   and only the frame and a band of up to 8 units around it take input, so
- *   the rest of the shadow passes clicks through; the opaque region of a
- *   window that isn't `SDL_WINDOW_TRANSPARENT` is the frame. Maximized, tiled or
+ *   only the frame and a band around it take input (see
+ *   `SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INPUT_MARGIN_NUMBER`), so the rest
+ *   of the shadow passes clicks through; and the opaque region of a window
+ *   that isn't `SDL_WINDOW_TRANSPARENT` is the frame. Maximized, tiled or
  *   fullscreen, the margins are zero (see
  *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_LEFT_NUMBER`). xdg-shell windows
  *   only, not libdecor's. The window keeps them if SDL has to make it again
  *   (as for an OpenGL renderer on a window made without `SDL_WINDOW_OPENGL`).
+ * - `SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INPUT_MARGIN_NUMBER` - the width, in
+ *   window coordinates, of the band around the frame that still takes input
+ *   while the window has frame insets, where the application's hit test (see
+ *   SDL_SetWindowHitTest()) can answer the edges it resizes from. Each side's
+ *   band is at most that side's inset. Defaults to 8; 0 leaves only the
+ *   frame taking input.
  *
  * These are additional supported properties on Windows:
  *
@@ -1462,6 +1469,7 @@ extern SDL_DECLSPEC SDL_Window * SDLCALL SDL_CreateWindowWithProperties(SDL_Prop
 #define SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_TOP_NUMBER      "SDL.window.create.wayland.frame_inset.top"
 #define SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_RIGHT_NUMBER    "SDL.window.create.wayland.frame_inset.right"
 #define SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INSET_BOTTOM_NUMBER   "SDL.window.create.wayland.frame_inset.bottom"
+#define SDL_PROP_WINDOW_CREATE_WAYLAND_FRAME_INPUT_MARGIN_NUMBER   "SDL.window.create.wayland.frame_input_margin"
 #define SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER                  "SDL.window.create.win32.hwnd"
 #define SDL_PROP_WINDOW_CREATE_WIN32_PIXEL_FORMAT_HWND_POINTER     "SDL.window.create.win32.pixel_format_hwnd"
 #define SDL_PROP_WINDOW_CREATE_X11_WINDOW_NUMBER                   "SDL.window.create.x11.window"
