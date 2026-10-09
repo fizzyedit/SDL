@@ -200,7 +200,8 @@ static void PublishFrameInsets(SDL_Window *window, int left, int top, int right,
 }
 
 /* Tells the compositor the frame is the window, takes input on the frame and a band around it
- * only, and publishes the insets in effect. Called whenever the size or the insets change.
+ * only, and publishes the insets in effect. Called whenever the size or the insets change. A
+ * hidden window has no xdg_surface to frame; the configure that shows it applies them.
  */
 static void ApplyFrameInsets(SDL_Window *window, int left, int top, int right, int bottom)
 {
@@ -208,9 +209,10 @@ static void ApplyFrameInsets(SDL_Window *window, int left, int top, int right, i
     const int frame_w = SDL_max(wind->current.logical_width - left - right, 1);
     const int frame_h = SDL_max(wind->current.logical_height - top - bottom, 1);
 
-    if (wind->shell_surface.xdg.surface) {
-        xdg_surface_set_window_geometry(wind->shell_surface.xdg.surface, left, top, frame_w, frame_h);
+    if (!wind->shell_surface.xdg.surface) {
+        return;
     }
+    xdg_surface_set_window_geometry(wind->shell_surface.xdg.surface, left, top, frame_w, frame_h);
 
     if (left || top || right || bottom) {
         const int ml = SDL_min(left, wind->frame_input_margin);
@@ -2429,6 +2431,11 @@ void Wayland_HideWindow(SDL_VideoDevice *_this, SDL_Window *window)
     // Attach a null buffer to unmap the surface.
     wl_surface_attach(wind->surface, NULL, 0, 0);
     wl_surface_commit(wind->surface);
+
+    /* The window geometry went with the xdg_surface: forget the insets applied, so the next
+     * configure frames the window again even at the same size.
+     */
+    SDL_zero(wind->applied_frame_insets);
 
     SDL_zero(wind->shell_surface);
     wind->show_hide_sync_required = true;
