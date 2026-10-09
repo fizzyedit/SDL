@@ -14,6 +14,7 @@
 /* Test collections */
 extern SDLTest_TestSuiteReference fizzyGPUTestSuite;
 extern SDLTest_TestSuiteReference fizzyXkbTestSuite;
+extern SDLTest_TestSuiteReference fizzyWaylandTestSuite;
 
 /* Comma-separated GPU drivers ("metal,vulkan") a test must find: when one of
  * them is missing the test fails instead of being skipped. Set by testfizzy's

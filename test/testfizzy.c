@@ -29,6 +29,7 @@ static SDLTest_TestSuiteRunner *runner;
 static SDLTest_TestSuiteReference *testSuites[] = {
     &fizzyGPUTestSuite,
     &fizzyXkbTestSuite,
+    &fizzyWaylandTestSuite,
     NULL
 };
 
