@@ -189,6 +189,16 @@ static int GetKeptCreateNumber(SDL_PropertiesID create_props, SDL_PropertiesID w
     return value;
 }
 
+// Publishes the frame insets in effect (SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_*).
+static void PublishFrameInsets(SDL_Window *window, int left, int top, int right, int bottom)
+{
+    const SDL_PropertiesID props = SDL_GetWindowProperties(window);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_LEFT_NUMBER, left);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_TOP_NUMBER, top);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_RIGHT_NUMBER, right);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_BOTTOM_NUMBER, bottom);
+}
+
 /* Tells the compositor the frame is the window, takes input on the frame and a band around it
  * only, and publishes the insets in effect. Called whenever the size or the insets change.
  */
@@ -220,11 +230,7 @@ static void ApplyFrameInsets(SDL_Window *window, int left, int top, int right, i
     wind->applied_frame_insets.right = right;
     wind->applied_frame_insets.bottom = bottom;
 
-    const SDL_PropertiesID props = SDL_GetWindowProperties(window);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_LEFT_NUMBER, left);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_TOP_NUMBER, top);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_RIGHT_NUMBER, right);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_BOTTOM_NUMBER, bottom);
+    PublishFrameInsets(window, left, top, right, bottom);
 }
 
 static void SetMinMaxDimensions(SDL_Window *window)
@@ -3038,6 +3044,15 @@ bool Wayland_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Proper
     SDL_SetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, data->surface);
     SDL_SetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_VIEWPORT_POINTER, data->viewport);
     SDL_SetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_EGL_WINDOW_POINTER, data->egl_window);
+
+    /* Until the compositor first configures the window, the insets in effect are those it will
+     * float with, so an application can lay itself out before showing it.
+     */
+    if (HasFrameInsets(data)) {
+        int il, it, ir, ib;
+        GetFrameInsets(data, true, &il, &it, &ir, &ib);
+        PublishFrameInsets(window, il, it, ir, ib);
+    }
 
     data->hit_test_result = SDL_HITTEST_NORMAL;
 

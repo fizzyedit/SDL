@@ -1634,8 +1634,10 @@ extern SDL_DECLSPEC SDL_Window * SDLCALL SDL_GetWindowParent(SDL_Window *window)
  *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_RIGHT_NUMBER` and
  *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_BOTTOM_NUMBER`: the frame insets in
  *   effect now, in window coordinates — those asked for at creation while the
- *   window floats, zero while it is maximized, tiled or fullscreen. They
- *   change with the window's size; read them on `SDL_EVENT_WINDOW_RESIZED`.
+ *   window floats, zero while it is maximized, tiled or fullscreen. Set from
+ *   creation on: until the window is first shown, the ones it will float
+ *   with. They change with the window's size; read them on
+ *   `SDL_EVENT_WINDOW_RESIZED`.
  *
  * On X11:
  *
