@@ -169,7 +169,8 @@ SDL_WAYLAND_SYM(xkb_level_index_t, xkb_state_key_get_level, (struct xkb_state *,
 #endif
 
 #if SDL_XKBCOMMON_CHECK_VERSION(1, 10, 0)
-SDL_WAYLAND_SYM(xkb_mod_mask_t, xkb_keymap_mod_get_mask, (struct xkb_keymap *, const char *))
+// Optional, as the libxkbcommon loaded at runtime may be older than the headers.
+SDL_WAYLAND_SYM_OPT(xkb_mod_mask_t, xkb_keymap_mod_get_mask, (struct xkb_keymap *, const char *))
 #endif
 
 #ifdef HAVE_LIBDECOR_H

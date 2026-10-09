@@ -1682,28 +1682,34 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
     seat->keyboard.xkb.num_layouts = 0;
 
 #if SDL_XKBCOMMON_CHECK_VERSION(1, 10, 0)
-    seat->keyboard.xkb.shift_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_MOD_NAME_SHIFT);
-    seat->keyboard.xkb.ctrl_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_MOD_NAME_CTRL);
-    seat->keyboard.xkb.alt_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_ALT);
-    seat->keyboard.xkb.gui_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_SUPER);
-    seat->keyboard.xkb.level3_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_LEVEL3);
-    seat->keyboard.xkb.level5_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_LEVEL5);
-    seat->keyboard.xkb.num_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_NUM);
-    seat->keyboard.xkb.caps_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_MOD_NAME_CAPS);
-#else
+    /* The libxkbcommon loaded at runtime may be older than the headers, and lack
+     * xkb_keymap_mod_get_mask(), so fall back to the modifier indices without it.
+     */
+    if (WAYLAND_xkb_keymap_mod_get_mask) {
+        seat->keyboard.xkb.shift_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_MOD_NAME_SHIFT);
+        seat->keyboard.xkb.ctrl_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_MOD_NAME_CTRL);
+        seat->keyboard.xkb.alt_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_ALT);
+        seat->keyboard.xkb.gui_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_SUPER);
+        seat->keyboard.xkb.level3_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_LEVEL3);
+        seat->keyboard.xkb.level5_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_LEVEL5);
+        seat->keyboard.xkb.num_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_VMOD_NAME_NUM);
+        seat->keyboard.xkb.caps_mask = WAYLAND_xkb_keymap_mod_get_mask(seat->keyboard.xkb.keymap, XKB_MOD_NAME_CAPS);
+    } else
+#endif
+    {
 #define GET_MOD_INDEX(mod) \
     WAYLAND_xkb_keymap_mod_get_index(seat->keyboard.xkb.keymap, XKB_MOD_NAME_##mod)
-    seat->keyboard.xkb.shift_mask = 1 << GET_MOD_INDEX(SHIFT);
-    seat->keyboard.xkb.ctrl_mask = 1 << GET_MOD_INDEX(CTRL);
-    seat->keyboard.xkb.alt_mask = 1 << GET_MOD_INDEX(ALT);
-    seat->keyboard.xkb.gui_mask = 1 << GET_MOD_INDEX(LOGO);
-    // Note: This is correct: Mod3 is typically level 5 shift, and Mod5 is typically level 3 shift.
-    seat->keyboard.xkb.level3_mask = 1 << GET_MOD_INDEX(MOD5);
-    seat->keyboard.xkb.level5_mask = 1 << GET_MOD_INDEX(MOD3);
-    seat->keyboard.xkb.num_mask = 1 << GET_MOD_INDEX(NUM);
-    seat->keyboard.xkb.caps_mask = 1 << GET_MOD_INDEX(CAPS);
+        seat->keyboard.xkb.shift_mask = 1 << GET_MOD_INDEX(SHIFT);
+        seat->keyboard.xkb.ctrl_mask = 1 << GET_MOD_INDEX(CTRL);
+        seat->keyboard.xkb.alt_mask = 1 << GET_MOD_INDEX(ALT);
+        seat->keyboard.xkb.gui_mask = 1 << GET_MOD_INDEX(LOGO);
+        // Note: This is correct: Mod3 is typically level 5 shift, and Mod5 is typically level 3 shift.
+        seat->keyboard.xkb.level3_mask = 1 << GET_MOD_INDEX(MOD5);
+        seat->keyboard.xkb.level5_mask = 1 << GET_MOD_INDEX(MOD3);
+        seat->keyboard.xkb.num_mask = 1 << GET_MOD_INDEX(NUM);
+        seat->keyboard.xkb.caps_mask = 1 << GET_MOD_INDEX(CAPS);
 #undef GET_MOD_INDEX
-#endif
+    }
 
     if (seat->keyboard.xkb.state != NULL) {
         /* if there's already a state, throw it away rather than leaking it before
