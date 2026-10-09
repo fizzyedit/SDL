@@ -1363,7 +1363,8 @@ extern SDL_DECLSPEC SDL_Window * SDLCALL SDL_CreatePopupWindow(SDL_Window *paren
  *   (`xdg_surface.set_window_geometry`), so it places, snaps and tiles the
  *   frame; the surface grows by the margins around the size it configures;
  *   and only the frame and a band of up to 8 units around it take input, so
- *   the rest of the shadow passes clicks through. Maximized, tiled or
+ *   the rest of the shadow passes clicks through; the opaque region of a
+ *   window that isn't `SDL_WINDOW_TRANSPARENT` is the frame. Maximized, tiled or
  *   fullscreen, the margins are zero (see
  *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_LEFT_NUMBER`). xdg-shell windows
  *   only, not libdecor's. The window keeps them if SDL has to make it again

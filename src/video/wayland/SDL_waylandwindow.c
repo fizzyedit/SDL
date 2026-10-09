@@ -400,9 +400,13 @@ static void SetSurfaceOpaqueRegion(SDL_WindowData *wind, bool is_opaque)
     SDL_VideoData *viddata = wind->waylandData;
 
     if (is_opaque) {
+        // Only the frame: any frame insets around it hold a shadow, which is never opaque.
+        const int left = wind->applied_frame_insets.left;
+        const int top = wind->applied_frame_insets.top;
+        const int width = SDL_max(wind->current.logical_width - left - wind->applied_frame_insets.right, 0);
+        const int height = SDL_max(wind->current.logical_height - top - wind->applied_frame_insets.bottom, 0);
         struct wl_region *region = wl_compositor_create_region(viddata->compositor);
-        wl_region_add(region, 0, 0,
-                      wind->current.logical_width, wind->current.logical_height);
+        wl_region_add(region, left, top, width, height);
         wl_surface_set_opaque_region(wind->surface, region);
         wl_region_destroy(region);
     } else {
