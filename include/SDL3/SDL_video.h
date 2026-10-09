@@ -1366,7 +1366,8 @@ extern SDL_DECLSPEC SDL_Window * SDLCALL SDL_CreatePopupWindow(SDL_Window *paren
  *   the rest of the shadow passes clicks through. Maximized, tiled or
  *   fullscreen, the margins are zero (see
  *   `SDL_PROP_WINDOW_WAYLAND_FRAME_INSET_LEFT_NUMBER`). xdg-shell windows
- *   only, not libdecor's.
+ *   only, not libdecor's. The window keeps them if SDL has to make it again
+ *   (as for an OpenGL renderer on a window made without `SDL_WINDOW_OPENGL`).
  *
  * These are additional supported properties on Windows:
  *
