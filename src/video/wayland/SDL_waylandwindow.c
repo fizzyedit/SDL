@@ -992,11 +992,15 @@ static void handle_xdg_toplevel_configure(void *data,
                     width = window->floating.w;
                     height = window->floating.h;
 
-                    // Clamp the window to the toplevel bounds, if any are set.
+                    /* Clamp the window to the toplevel bounds, if any are set. They bound the
+                     * frame, so the surface may be larger by its insets.
+                     */
                     if (wind->shell_surface_status == WAYLAND_SHELL_SURFACE_STATUS_WAITING_FOR_CONFIGURE &&
                         wind->toplevel_bounds.width && wind->toplevel_bounds.height) {
-                        width = SDL_min(wind->toplevel_bounds.width, width);
-                        height = SDL_min(wind->toplevel_bounds.height, height);
+                        int il, it, ir, ib;
+                        GetFrameInsets(wind, floating, &il, &it, &ir, &ib);
+                        width = SDL_min(wind->toplevel_bounds.width + il + ir, width);
+                        height = SDL_min(wind->toplevel_bounds.height + it + ib, height);
                     }
                 } else {
                     width = window->windowed.w;
