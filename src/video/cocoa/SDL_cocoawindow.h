@@ -64,6 +64,8 @@ typedef enum
     NSViewLayerContentsRedrawPolicy liveResizeRedrawPolicy;
     Uint64 liveResizeFrameNS;
     BOOL liveResizeFellBack;
+    NSSize liveResizeSize;
+    Uint64 liveResizeStillNS;
     BOOL inLiveResizeUpdate;
 }
 

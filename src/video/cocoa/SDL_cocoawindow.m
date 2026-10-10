@@ -1159,19 +1159,14 @@ static NSCursor *Cocoa_GetDesiredCursor(void)
     }
     liveResizeFrameNS = SDL_GetTicksNS();
     liveResizeFellBack = NO;
+    liveResizeSize = _data.nswindow.frame.size;
+    liveResizeStillNS = liveResizeFrameNS;
 
     liveResizeTimer = [NSTimer scheduledTimerWithTimeInterval:interval
                                                       repeats:TRUE
                                                         block:^(NSTimer *unusedTimer)
     {
-        /* AppKit can end a live resize without posting
-         * NSWindowDidEndLiveResizeNotification: a window dragged to the top
-         * of the screen to fill it (macOS 26) starts one and never says it
-         * ended. Left running, this timer had the view display, and the app
-         * draw a frame from that display, every tick; the app never got back
-         * to its events. */
-        if (!self->_data.nswindow.inLiveResize) {
-            [self windowDidEndLiveResize:nil];
+        if ([self endLiveResizeIfOver]) {
             return;
         }
         NSView *view = self->liveResizeView;
@@ -1213,6 +1208,47 @@ static NSCursor *Cocoa_GetDesiredCursor(void)
     liveResizeView = nil;
 }
 
+/* End a live resize that is over, whatever AppKit has said of it. Whether it
+ * was ended.
+ *
+ * AppKit can end a live resize without posting
+ * NSWindowDidEndLiveResizeNotification: a window dragged to the top of the
+ * screen to fill it (macOS 26) starts one and never says it ended. And it can
+ * leave one open after it is over: tiled to a side of the screen (macOS 26),
+ * the window still says it is in a live resize, with no button held and its
+ * size settled, for good. Either way the timer had the view display, and the
+ * app draw a frame from that display, every tick; the app never got back to
+ * its events. So a live resize the window no longer reports, or one that has
+ * gone still with no button held for half a second, is over: a drag holds a
+ * button, and an animated resize changes the size every tick.
+ *
+ * Measured on macOS 26: a tile's live resize settles its size about 240 ms in
+ * and AppKit ends it about 600 ms in, so half a second leaves AppKit's own end
+ * first. Where it does not come, it is most likely held up by the frames drawn
+ * from every display: once they stop, AppKit ended it about 110 ms later. */
+- (BOOL)endLiveResizeIfOver
+{
+    if (liveResizeTimer == nil) {
+        return NO;
+    }
+    if (!_data.nswindow.inLiveResize) {
+        [self windowDidEndLiveResize:nil];
+        return YES;
+    }
+    const NSSize size = _data.nswindow.frame.size;
+    const Uint64 now = SDL_GetTicksNS();
+    if (!NSEqualSizes(size, liveResizeSize) || [NSEvent pressedMouseButtons] != 0) {
+        liveResizeSize = size;
+        liveResizeStillNS = now;
+        return NO;
+    }
+    if (now - liveResizeStillNS > SDL_NS_PER_SECOND / 2) {
+        [self windowDidEndLiveResize:nil];
+        return YES;
+    }
+    return NO;
+}
+
 /* Run the app's frame from inside a live resize: SDL_AppIterate() when the app
  * uses the main callbacks, an SDL_EVENT_WINDOW_EXPOSED event otherwise. Never
  * from inside one already running, where a frame that resizes the window would
@@ -1238,6 +1274,9 @@ static NSCursor *Cocoa_GetDesiredCursor(void)
 - (void)drawLiveResizeFrame
 {
     if (inLiveResizeUpdate) {
+        return;
+    }
+    if ([self endLiveResizeIfOver]) {
         return;
     }
     /* AppKit may display a step before it notifies of it: bring SDL's sizes,
