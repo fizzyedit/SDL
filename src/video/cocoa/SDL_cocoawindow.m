@@ -1164,6 +1164,16 @@ static NSCursor *Cocoa_GetDesiredCursor(void)
                                                       repeats:TRUE
                                                         block:^(NSTimer *unusedTimer)
     {
+        /* AppKit can end a live resize without posting
+         * NSWindowDidEndLiveResizeNotification: a window dragged to the top
+         * of the screen to fill it (macOS 26) starts one and never says it
+         * ended. Left running, this timer had the view display, and the app
+         * draw a frame from that display, every tick; the app never got back
+         * to its events. */
+        if (!self->_data.nswindow.inLiveResize) {
+            [self windowDidEndLiveResize:nil];
+            return;
+        }
         NSView *view = self->liveResizeView;
         if (view == nil) {
             [self updateLiveResize];
