@@ -66,6 +66,8 @@ typedef enum
     BOOL liveResizeFellBack;
     NSSize liveResizeSize;
     Uint64 liveResizeStillNS;
+    NSSize liveResizeDrawnSize;
+    BOOL liveResizeRestPending;
     BOOL inLiveResizeUpdate;
 }
 
